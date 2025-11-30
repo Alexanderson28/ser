@@ -11,21 +11,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ЮKassa credentials from Render Environment
-const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
-const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
+// ЮKassa credentials из Render Environment Variables
+const SHOP_ID = process.env.YOOKASSA_SHOP_ID;      // Ваш shopId
+const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY; // Ваш секретный ключ
 
-// ==========================
-//  CREATE PAYMENT
-// ==========================
+// Создание платежа
 app.post("/create-payment", async (req, res) => {
   try {
     const { amount, description, return_url } = req.body;
 
     if (!amount || !return_url) {
-      return res.status(400).json({
-        error: "Не указаны обязательные параметры"
-      });
+      return res.status(400).json({ error: "Не указаны обязательные параметры" });
     }
 
     const idempotenceKey = Math.random().toString(36).substring(2);
@@ -62,50 +58,29 @@ app.post("/create-payment", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("ЮKassa error:", error.response?.data || error.message);
+    console.error("Ошибка ЮKassa:", error.response?.data || error.message);
     res.status(500).json({ error: "Ошибка создания платежа" });
   }
 });
 
-// ==========================
-//  PAYMENT STATUS
-// ==========================
+// Проверка статуса платежа (опционально)
 app.get("/payment-status/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
-    const response = await axios.get(
-      `https://api.yookassa.ru/v3/payments/${id}`,
-      {
-        auth: {
-          username: SHOP_ID,
-          password: SECRET_KEY
-        }
+    const response = await axios.get(`https://api.yookassa.ru/v3/payments/${id}`, {
+      auth: {
+        username: SHOP_ID,
+        password: SECRET_KEY
       }
-    );
-
+    });
     res.json(response.data);
-
   } catch (error) {
-    console.error("Статус платежа ошибка:", error.response?.data || error.message);
+    console.error("Ошибка проверки платежа:", error.response?.data || error.message);
     res.status(500).json({ error: "Ошибка проверки платежа" });
   }
 });
 
-// ==========================
-//  RETURN AFTER PAYMENT
-// ==========================
-//
-// YooKassa → отправляет сюда
-// Мы → переадресовываем обратно в VK Mini App
-//
-app.get("/paid", (req, res) => {
-  res.redirect("https://vk.com/app54348330_-234056692?ref=paid");
-});
-
-// ==========================
-//  START SERVER
-// ==========================
+// Запуск сервера
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
