@@ -12,8 +12,8 @@ app.use(cors());
 app.use(express.json());
 
 // ЮKassa credentials из Render Environment Variables
-const SHOP_ID = process.env.YOOKASSA_SHOP_ID;      // Ваш shopId
-const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY; // Ваш секретный ключ
+const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
+const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 
 // Создание платежа
 app.post("/create-payment", async (req, res) => {
@@ -58,24 +58,30 @@ app.post("/create-payment", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Ошибка ЮKassa:", error.response?.data || error.message);
+    console.error("ЮKassa error:", error.response?.data || error.message);
     res.status(500).json({ error: "Ошибка создания платежа" });
   }
 });
 
-// Проверка статуса платежа (опционально)
+// Проверка статуса платежа (по желанию)
 app.get("/payment-status/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const response = await axios.get(`https://api.yookassa.ru/v3/payments/${id}`, {
-      auth: {
-        username: SHOP_ID,
-        password: SECRET_KEY
+
+    const response = await axios.get(
+      `https://api.yookassa.ru/v3/payments/${id}`,
+      {
+        auth: {
+          username: SHOP_ID,
+          password: SECRET_KEY
+        }
       }
-    });
+    );
+
     res.json(response.data);
+
   } catch (error) {
-    console.error("Ошибка проверки платежа:", error.response?.data || error.message);
+    console.error("Статус платежа ошибка:", error.response?.data || error.message);
     res.status(500).json({ error: "Ошибка проверки платежа" });
   }
 });
