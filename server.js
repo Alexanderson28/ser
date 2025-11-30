@@ -1,50 +1,93 @@
-import React from 'react';
+import express from "express";
+import axios from "axios";
+import cors from "cors";
+import dotenv from "dotenv";
 
-const Pay = ({ id, go }) => {
+dotenv.config();
 
-  const handlePayment = async () => {
-    try {
-      const response = await fetch("https://ser-hyfd.onrender.com/create-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: 990, // сумма в рублях
-          description: "Подписка Арины (1 месяц)",
-          return_url: "https://vk.com/app54348330_-234056692?ref=group_menu"
-        })
-      });
+const app = express();
 
-      const data = await response.json();
+// Middlewares
+app.use(cors());
+app.use(express.json());
 
-      if (data.confirmationUrl) {
-        // Редирект на страницу оплаты ЮKassa
-        window.location.href = data.confirmationUrl;
-      } else {
-        alert("Ошибка: не получили URL для оплаты");
-      }
+// ЮKassa credentials from Render Environment
+const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
+const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 
-    } catch (error) {
-      console.error("Ошибка при создании платежа:", error);
-      alert("Ошибка при создании платежа. Попробуйте позже.");
+// Create payment
+app.post("/create-payment", async (req, res) => {
+  try {
+    const { amount, description, return_url } = req.body;
+
+    if (!amount || !return_url) {
+      return res.status(400).json({ error: "Не указаны обязательные параметры" });
     }
-  };
 
-  return (
-    <div id={id} className="panel-container">
-      <div className="panel-title">Платёжный экран</div>
-      <div className="panel-subtitle">
-        Оплатите подписку, чтобы получить доступ к ИИ-ассистенту Арины на 1 месяц.
-      </div>
+    const idempotenceKey = Math.random().toString(36).substring(2);
 
-      <button className="button-main" onClick={handlePayment}>
-        Оплатить 990 ₽
-      </button>
+    const response = await axios.post(
+      "https://api.yookassa.ru/v3/payments",
+      {
+        amount: {
+          value: Number(amount).toFixed(2),
+          currency: "RUB"
+        },
+        confirmation: {
+          type: "redirect",
+          return_url
+        },
+        capture: true,
+        description: description || "Оплата подписки"
+      },
+      {
+        auth: {
+          username: SHOP_ID,
+          password: SECRET_KEY
+        },
+        headers: {
+          "Idempotence-Key": idempotenceKey,
+          "Content-Type": "application/json"
+        }
+      }
+    );
 
-      <button className="button-secondary" onClick={() => go('subscribe')}>
-        Назад
-      </button>
-    </div>
-  );
-};
+    res.json({
+      confirmationUrl: response.data.confirmation.confirmation_url,
+      paymentId: response.data.id
+    });
 
-export default Pay;
+  } catch (error) {
+    console.error("ЮKassa error:", error.response?.data || error.message);
+    res.status(500).json({ error: "Ошибка создания платежа" });
+  }
+});
+
+// Check payment status
+app.get("/payment-status/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const response = await axios.get(
+      `https://api.yookassa.ru/v3/payments/${id}`,
+      {
+        auth: {
+          username: SHOP_ID,
+          password: SECRET_KEY
+        }
+      }
+    );
+
+    res.json(response.data);
+
+  } catch (error) {
+    console.error("Статус платежа ошибка:", error.response?.data || error.message);
+    res.status(500).json({ error: "Ошибка проверки платежа" });
+  }
+});
+
+// Start server
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
