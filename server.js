@@ -15,13 +15,17 @@ app.use(express.json());
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 
-// Create payment
+// ==========================
+//  CREATE PAYMENT
+// ==========================
 app.post("/create-payment", async (req, res) => {
   try {
     const { amount, description, return_url } = req.body;
 
     if (!amount || !return_url) {
-      return res.status(400).json({ error: "Не указаны обязательные параметры" });
+      return res.status(400).json({
+        error: "Не указаны обязательные параметры"
+      });
     }
 
     const idempotenceKey = Math.random().toString(36).substring(2);
@@ -63,7 +67,9 @@ app.post("/create-payment", async (req, res) => {
   }
 });
 
-// Check payment status
+// ==========================
+//  PAYMENT STATUS
+// ==========================
 app.get("/payment-status/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -86,7 +92,20 @@ app.get("/payment-status/:id", async (req, res) => {
   }
 });
 
-// Start server
+// ==========================
+//  RETURN AFTER PAYMENT
+// ==========================
+//
+// YooKassa → отправляет сюда
+// Мы → переадресовываем обратно в VK Mini App
+//
+app.get("/paid", (req, res) => {
+  res.redirect("https://vk.com/app54348330_-234056692?ref=paid");
+});
+
+// ==========================
+//  START SERVER
+// ==========================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
