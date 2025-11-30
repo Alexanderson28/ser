@@ -7,20 +7,21 @@ dotenv.config();
 
 const app = express();
 
-// Разрешаем CORS с вашего фронтенда
+// Разрешаем запросы с VK Mini Apps
 app.use(cors({
-  origin: "https://alexanderson28.github.io"
+  origin: ['https://vk.com', 'https://*.vkapps.ru', 'http://localhost:3000'],
+  credentials: true
 }));
 app.use(express.json());
 
-// ЮKassa credentials из Render Environment
-const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
-const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
+const SHOP_ID = process.env.YOOKASSA_SHOP_ID;      // ваш Shop ID из ЮKassa
+const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY; // секретный ключ
 
 // Создание платежа
 app.post("/create-payment", async (req, res) => {
   try {
     const { amount, description, return_url } = req.body;
+
     if (!amount || !return_url) {
       return res.status(400).json({ error: "Не указаны обязательные параметры" });
     }
@@ -30,13 +31,22 @@ app.post("/create-payment", async (req, res) => {
     const response = await axios.post(
       "https://api.yookassa.ru/v3/payments",
       {
-        amount: { value: Number(amount).toFixed(2), currency: "RUB" },
-        confirmation: { type: "redirect", return_url },
+        amount: {
+          value: Number(amount).toFixed(2),
+          currency: "RUB"
+        },
+        confirmation: {
+          type: "redirect",
+          return_url
+        },
         capture: true,
         description: description || "Оплата подписки"
       },
       {
-        auth: { username: SHOP_ID, password: SECRET_KEY },
+        auth: {
+          username: SHOP_ID,
+          password: SECRET_KEY
+        },
         headers: {
           "Idempotence-Key": idempotenceKey,
           "Content-Type": "application/json"
@@ -55,20 +65,7 @@ app.post("/create-payment", async (req, res) => {
   }
 });
 
-// Проверка статуса платежа (опционально)
-app.get("/payment-status/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const response = await axios.get(
-      `https://api.yookassa.ru/v3/payments/${id}`,
-      { auth: { username: SHOP_ID, password: SECRET_KEY } }
-    );
-    res.json(response.data);
-  } catch (error) {
-    console.error("Ошибка проверки платежа:", error.response?.data || error.message);
-    res.status(500).json({ error: "Ошибка проверки платежа" });
-  }
-});
-
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
