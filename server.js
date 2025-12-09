@@ -7,7 +7,7 @@ dotenv.config();
 
 const app = express();
 
-// Разрешаем запросы с VK Mini Apps
+// Разрешаем запросы из VK Mini App
 app.use(cors({
   origin: ['https://vk.com', 'https://*.vkapps.ru', 'http://localhost:3000'],
   credentials: true
@@ -22,9 +22,7 @@ app.post("/create-payment", async (req, res) => {
   try {
     const { amount, description } = req.body;
 
-    if (!amount) {
-      return res.status(400).json({ error: "Не указана сумма платежа" });
-    }
+    if (!amount) return res.status(400).json({ error: "Не указана сумма" });
 
     const idempotenceKey = Math.random().toString(36).substring(2);
 
@@ -38,6 +36,7 @@ app.post("/create-payment", async (req, res) => {
         },
         capture: true,
         description: description || "Оплата подписки"
+        // confirmation убираем — VK Bridge откроет форму
       },
       {
         auth: {
@@ -58,7 +57,7 @@ app.post("/create-payment", async (req, res) => {
 
   } catch (error) {
     console.error("Ошибка создания платежа:", error.response?.data || error.message);
-    res.status(500).json({ error: "Ошибка создания платежа" });
+    res.status(500).json({ error: error.response?.data || "Ошибка создания платежа" });
   }
 });
 
@@ -68,21 +67,16 @@ app.get("/payment-status/:id", async (req, res) => {
     const { id } = req.params;
 
     const response = await axios.get(`https://api.yookassa.ru/v3/payments/${id}`, {
-      auth: {
-        username: SHOP_ID,
-        password: SECRET_KEY
-      }
+      auth: { username: SHOP_ID, password: SECRET_KEY }
     });
 
     res.json(response.data);
 
   } catch (error) {
     console.error("Ошибка проверки платежа:", error.response?.data || error.message);
-    res.status(500).json({ error: "Ошибка проверки платежа" });
+    res.status(500).json({ error: error.response?.data || "Ошибка проверки платежа" });
   }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
