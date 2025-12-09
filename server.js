@@ -7,10 +7,17 @@ dotenv.config();
 
 const app = express();
 
+// Разрешаем запросы с VK Mini Apps, localhost и GitHub Pages
 app.use(cors({
-  origin: ['https://vk.com', 'https://*.vkapps.ru', 'http://localhost:3000'],
+  origin: [
+    'https://vk.com',
+    'https://*.vkapps.ru',
+    'http://localhost:3000',
+    'https://alexanderson28.github.io'  // добавлено для фронта
+  ],
   credentials: true
 }));
+
 app.use(express.json());
 
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID;      
@@ -30,7 +37,7 @@ app.post("/create-payment", async (req, res) => {
         amount: { value: Number(amount).toFixed(2), currency: "RUB" },
         capture: true,
         description: description || "Оплата подписки",
-        confirmation: { type: "embedded" } // ⚠️ для VK Bridge
+        confirmation: { type: "embedded" } // для VK Bridge
       },
       {
         auth: { username: SHOP_ID, password: SECRET_KEY },
