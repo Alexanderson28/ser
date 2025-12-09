@@ -14,30 +14,27 @@ app.use(cors({
 }));
 app.use(express.json());
 
-const SHOP_ID = process.env.YOOKASSA_SHOP_ID;      // ваш Shop ID из ЮKassa
-const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY; // секретный ключ
+const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
+const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 
 // Создание платежа
 app.post("/create-payment", async (req, res) => {
   try {
-    const { amount, description, return_url } = req.body;
+    const { amount, description } = req.body;
 
-    if (!amount || !return_url) {
-      return res.status(400).json({ error: "Не указаны обязательные параметры" });
+    if (!amount) {
+      return res.status(400).json({ error: "Не указана сумма платежа" });
     }
 
     const idempotenceKey = Math.random().toString(36).substring(2);
 
+    // Создаём платеж в ЮKassa без redirect, VK Bridge откроет форму
     const response = await axios.post(
       "https://api.yookassa.ru/v3/payments",
       {
         amount: {
           value: Number(amount).toFixed(2),
           currency: "RUB"
-        },
-        confirmation: {
-          type: "redirect",
-          return_url
         },
         capture: true,
         description: description || "Оплата подписки"
@@ -55,13 +52,33 @@ app.post("/create-payment", async (req, res) => {
     );
 
     res.json({
-      confirmationUrl: response.data.confirmation.confirmation_url,
-      paymentId: response.data.id
+      paymentId: response.data.id,
+      amount: response.data.amount.value
     });
 
   } catch (error) {
     console.error("Ошибка создания платежа:", error.response?.data || error.message);
     res.status(500).json({ error: "Ошибка создания платежа" });
+  }
+});
+
+// Проверка статуса платежа
+app.get("/payment-status/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const response = await axios.get(`https://api.yookassa.ru/v3/payments/${id}`, {
+      auth: {
+        username: SHOP_ID,
+        password: SECRET_KEY
+      }
+    });
+
+    res.json(response.data);
+
+  } catch (error) {
+    console.error("Ошибка проверки платежа:", error.response?.data || error.message);
+    res.status(500).json({ error: "Ошибка проверки платежа" });
   }
 });
 
