@@ -56,8 +56,8 @@ app.post("/create-payment", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Ошибка создания платежа:", error.response?.data || error.message);
-    res.status(500).json({ error: error.response?.data || "Ошибка создания платежа" });
+    console.error("Ошибка создания платежа full:", error.response?.data || error.message);
+res.status(500).json({ error: error.response?.data || error.message });
   }
 });
 
