@@ -7,19 +7,21 @@ dotenv.config();
 
 const app = express();
 
+// Разрешаем запросы с VK Mini Apps
 app.use(cors({
   origin: ['https://vk.com', 'https://*.vkapps.ru', 'http://localhost:3000'],
   credentials: true
 }));
 app.use(express.json());
 
-const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
+const SHOP_ID = process.env.YOOKASSA_SHOP_ID;      
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 
 // Создание платежа
 app.post("/create-payment", async (req, res) => {
   try {
     const { amount, description } = req.body;
+
     if (!amount) return res.status(400).json({ error: "Не указана сумма" });
 
     const idempotenceKey = Math.random().toString(36).substring(2);
@@ -30,6 +32,7 @@ app.post("/create-payment", async (req, res) => {
         amount: { value: Number(amount).toFixed(2), currency: "RUB" },
         capture: true,
         description: description || "Оплата подписки"
+        // confirmation убрали, VK Bridge будет открывать форму
       },
       {
         auth: { username: SHOP_ID, password: SECRET_KEY },
@@ -37,7 +40,10 @@ app.post("/create-payment", async (req, res) => {
       }
     );
 
-    res.json({ paymentId: response.data.id, amount: response.data.amount.value });
+    res.json({
+      paymentId: response.data.id,
+      amount: response.data.amount.value
+    });
 
   } catch (error) {
     console.error("Ошибка создания платежа full:", error.response?.data || error.message);
