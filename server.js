@@ -7,7 +7,6 @@ dotenv.config();
 
 const app = express();
 
-// Разрешаем запросы из VK Mini App
 app.use(cors({
   origin: ['https://vk.com', 'https://*.vkapps.ru', 'http://localhost:3000'],
   credentials: true
@@ -21,43 +20,29 @@ const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 app.post("/create-payment", async (req, res) => {
   try {
     const { amount, description } = req.body;
-
     if (!amount) return res.status(400).json({ error: "Не указана сумма" });
 
     const idempotenceKey = Math.random().toString(36).substring(2);
 
-    // Создаём платеж в ЮKassa без redirect, VK Bridge откроет форму
     const response = await axios.post(
       "https://api.yookassa.ru/v3/payments",
       {
-        amount: {
-          value: Number(amount).toFixed(2),
-          currency: "RUB"
-        },
+        amount: { value: Number(amount).toFixed(2), currency: "RUB" },
         capture: true,
         description: description || "Оплата подписки"
-        // confirmation убираем — VK Bridge откроет форму
+        // confirmation убираем, VK Bridge откроет форму
       },
       {
-        auth: {
-          username: SHOP_ID,
-          password: SECRET_KEY
-        },
-        headers: {
-          "Idempotence-Key": idempotenceKey,
-          "Content-Type": "application/json"
-        }
+        auth: { username: SHOP_ID, password: SECRET_KEY },
+        headers: { "Idempotence-Key": idempotenceKey, "Content-Type": "application/json" }
       }
     );
 
-    res.json({
-      paymentId: response.data.id,
-      amount: response.data.amount.value
-    });
+    res.json({ paymentId: response.data.id, amount: response.data.amount.value });
 
   } catch (error) {
     console.error("Ошибка создания платежа full:", error.response?.data || error.message);
-res.status(500).json({ error: error.response?.data || error.message });
+    res.status(500).json({ error: error.response?.data || error.message });
   }
 });
 
@@ -65,16 +50,13 @@ res.status(500).json({ error: error.response?.data || error.message });
 app.get("/payment-status/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
     const response = await axios.get(`https://api.yookassa.ru/v3/payments/${id}`, {
       auth: { username: SHOP_ID, password: SECRET_KEY }
     });
-
     res.json(response.data);
-
   } catch (error) {
     console.error("Ошибка проверки платежа:", error.response?.data || error.message);
-    res.status(500).json({ error: error.response?.data || "Ошибка проверки платежа" });
+    res.status(500).json({ error: error.response?.data || error.message });
   }
 });
 
