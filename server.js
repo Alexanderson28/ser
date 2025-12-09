@@ -7,7 +7,6 @@ dotenv.config();
 
 const app = express();
 
-// Разрешаем запросы с VK Mini Apps
 app.use(cors({
   origin: ['https://vk.com', 'https://*.vkapps.ru', 'http://localhost:3000'],
   credentials: true
@@ -21,7 +20,6 @@ const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 app.post("/create-payment", async (req, res) => {
   try {
     const { amount, description } = req.body;
-
     if (!amount) return res.status(400).json({ error: "Не указана сумма" });
 
     const idempotenceKey = Math.random().toString(36).substring(2);
@@ -31,8 +29,8 @@ app.post("/create-payment", async (req, res) => {
       {
         amount: { value: Number(amount).toFixed(2), currency: "RUB" },
         capture: true,
-        description: description || "Оплата подписки"
-        // confirmation убрали, VK Bridge будет открывать форму
+        description: description || "Оплата подписки",
+        confirmation: { type: "embedded" } // ⚠️ для VK Bridge
       },
       {
         auth: { username: SHOP_ID, password: SECRET_KEY },
@@ -42,6 +40,7 @@ app.post("/create-payment", async (req, res) => {
 
     res.json({
       paymentId: response.data.id,
+      confirmation: response.data.confirmation,
       amount: response.data.amount.value
     });
 
