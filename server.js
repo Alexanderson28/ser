@@ -30,7 +30,6 @@ app.post("/create-payment", async (req, res) => {
         amount: { value: Number(amount).toFixed(2), currency: "RUB" },
         capture: true,
         description: description || "Оплата подписки"
-        // confirmation убираем, VK Bridge откроет форму
       },
       {
         auth: { username: SHOP_ID, password: SECRET_KEY },
