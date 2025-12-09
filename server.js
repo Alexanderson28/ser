@@ -7,15 +7,10 @@ dotenv.config();
 
 const app = express();
 
-// Разрешаем запросы с VK Mini Apps, localhost и GitHub Pages
+// Разрешаем все origin для теста
 app.use(cors({
-  origin: [
-    'https://vk.com',
-    'https://*.vkapps.ru',
-    'http://localhost:3000',
-    'https://alexanderson28.github.io'  // добавлено для фронта
-  ],
-  credentials: true
+  origin: '*',
+  credentials: false
 }));
 
 app.use(express.json());
@@ -37,7 +32,7 @@ app.post("/create-payment", async (req, res) => {
         amount: { value: Number(amount).toFixed(2), currency: "RUB" },
         capture: true,
         description: description || "Оплата подписки",
-        confirmation: { type: "embedded" } // для VK Bridge
+        confirmation: { type: "embedded" }
       },
       {
         auth: { username: SHOP_ID, password: SECRET_KEY },
@@ -52,7 +47,7 @@ app.post("/create-payment", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Ошибка создания платежа full:", error.response?.data || error.message);
+    console.error("Ошибка создания платежа:", error.response?.data || error.message);
     res.status(500).json({ error: error.response?.data || error.message });
   }
 });
