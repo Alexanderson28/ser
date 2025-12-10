@@ -7,96 +7,96 @@ dotenv.config();
 
 const app = express();
 
+// ----------------------
+// 🔥 ВАЖНО! Правильные CORS
+// ----------------------
 app.use(cors({
-  origin: ['https://vk.com', 'https://*.vkapps.ru', 'http://localhost:3000', '*'],
+  origin: [
+    "https://vk.com",
+    "https://*.vkapps.ru",
+    "http://localhost:3000",
+    "https://alexanderson28.github.io"  // GitHub Pages — ОБЯЗАТЕЛЬНО
+  ],
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type", "Idempotence-Key"],
   credentials: true
 }));
+
 app.use(express.json());
 
+// ----------------------
+// ЮKassa credentials
+// ----------------------
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 
-const RETURN_URL = "https://vk.com/app54348330"; // твой мини-апп ID
-
-// Универсальный платёж: сначала embedded, если не работает — redirect
+// ----------------------
+// 🔥 Создание платежа
+// ----------------------
 app.post("/create-payment", async (req, res) => {
   try {
     const { amount, description } = req.body;
+
+    if (!amount) return res.status(400).json({ error: "Не указана сумма" });
+
     const idempotenceKey = Math.random().toString(36).substring(2);
 
-    if (!amount) {
-      return res.status(400).json({ error: "Не указана сумма" });
-    }
-
-    // 1️⃣ Embedded
-    try {
-      const embedded = await axios.post(
-        "https://api.yookassa.ru/v3/payments",
-        {
-          amount: { value: Number(amount).toFixed(2), currency: "RUB" },
-          capture: true,
-          description: description || "Оплата подписки",
-          confirmation: { type: "embedded" }
-        },
-        {
-          auth: { username: SHOP_ID, password: SECRET_KEY },
-          headers: { "Idempotence-Key": idempotenceKey }
-        }
-      );
-
-      return res.json({
-        type: "embedded",
-        paymentId: embedded.data.id,
-        confirmation_token: embedded.data.confirmation.confirmation_token
-      });
-    } catch (e) {
-      console.log("Embedded недоступен, переключаемся на redirect");
-    }
-
-    // 2️⃣ Redirect
-    const redirect = await axios.post(
+    const response = await axios.post(
       "https://api.yookassa.ru/v3/payments",
       {
-        amount: { value: Number(amount).toFixed(2), currency: "RUB" },
-        capture: true,
-        description: description || "Оплата подписки",
+        amount: {
+          value: Number(amount).toFixed(2),
+          currency: "RUB"
+        },
         confirmation: {
-          type: "redirect",
-          return_url: RETURN_URL
-        }
+          type: "embedded"   // ВАЖНО: для VK Mini Apps
+        },
+        capture: true,
+        description: description || "Оплата подписки"
       },
       {
         auth: { username: SHOP_ID, password: SECRET_KEY },
-        headers: { "Idempotence-Key": idempotenceKey }
+        headers: {
+          "Idempotence-Key": idempotenceKey,
+          "Content-Type": "application/json"
+        }
       }
     );
 
-    return res.json({
-      type: "redirect",
-      paymentId: redirect.data.id,
-      confirmation_url: redirect.data.confirmation.confirmation_url
+    res.json({
+      type: "embedded",
+      paymentId: response.data.id,
+      confirmation_token: response.data.confirmation.confirmation_token,
+      amount: response.data.amount.value
     });
 
   } catch (error) {
-    console.error("Ошибка создания платежа:", error.response?.data || error);
+    console.error("Ошибка создания платежа:", error.response?.data || error.message);
     res.status(500).json({ error: error.response?.data || error.message });
   }
 });
 
-// Проверка статуса
+// ----------------------
+// 🔍 Проверка статуса платежа
+// ----------------------
 app.get("/payment-status/:id", async (req, res) => {
   try {
+    const { id } = req.params;
+
     const response = await axios.get(
-      `https://api.yookassa.ru/v3/payments/${req.params.id}`,
+      `https://api.yookassa.ru/v3/payments/${id}`,
       {
         auth: { username: SHOP_ID, password: SECRET_KEY }
       }
     );
+
     res.json(response.data);
+
   } catch (error) {
+    console.error("Ошибка проверки платежа:", error.response?.data || error.message);
     res.status(500).json({ error: error.response?.data || error.message });
   }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
