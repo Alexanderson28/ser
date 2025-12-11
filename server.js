@@ -8,14 +8,14 @@ dotenv.config();
 const app = express();
 
 // ----------------------
-// 🔥 ВАЖНО! Правильные CORS
+// CORS
 // ----------------------
 app.use(cors({
   origin: [
     "https://vk.com",
     "https://*.vkapps.ru",
     "http://localhost:3000",
-    "https://alexanderson28.github.io"  // GitHub Pages — ОБЯЗАТЕЛЬНО
+    "https://alexanderson28.github.io"
   ],
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type", "Idempotence-Key"],
@@ -25,32 +25,32 @@ app.use(cors({
 app.use(express.json());
 
 // ----------------------
-// ЮKassa credentials
+// YooKassa credentials
 // ----------------------
 const SHOP_ID = process.env.YOOKASSA_SHOP_ID;
 const SECRET_KEY = process.env.YOOKASSA_SECRET_KEY;
 
 // ----------------------
-// 🔥 Создание платежа
+// In-memory база подписок
+// ----------------------
+const subscriptions = {}; // { vk_id: { paymentId, status, endDate } }
+
+// ----------------------
+// Создание платежа
 // ----------------------
 app.post("/create-payment", async (req, res) => {
   try {
-    const { amount, description } = req.body;
+    const { amount, description, vk_id } = req.body;
 
-    if (!amount) return res.status(400).json({ error: "Не указана сумма" });
+    if (!amount || !vk_id) return res.status(400).json({ error: "Не указана сумма или VK ID" });
 
     const idempotenceKey = Math.random().toString(36).substring(2);
 
     const response = await axios.post(
       "https://api.yookassa.ru/v3/payments",
       {
-        amount: {
-          value: Number(amount).toFixed(2),
-          currency: "RUB"
-        },
-        confirmation: {
-          type: "embedded"   // ВАЖНО: для VK Mini Apps
-        },
+        amount: { value: Number(amount).toFixed(2), currency: "RUB" },
+        confirmation: { type: "embedded" }, // Для VK Mini Apps
         capture: true,
         description: description || "Оплата подписки"
       },
@@ -62,6 +62,13 @@ app.post("/create-payment", async (req, res) => {
         }
       }
     );
+
+    // Сохраняем подписку временно в памяти
+    subscriptions[vk_id] = {
+      paymentId: response.data.id,
+      status: response.data.status,
+      endDate: null
+    };
 
     res.json({
       type: "embedded",
@@ -77,11 +84,14 @@ app.post("/create-payment", async (req, res) => {
 });
 
 // ----------------------
-// 🔍 Проверка статуса платежа
+// Проверка статуса платежа
 // ----------------------
 app.get("/payment-status/:id", async (req, res) => {
   try {
     const { id } = req.params;
+    const vk_id = req.query.vk_id;
+
+    if (!vk_id || !subscriptions[vk_id]) return res.status(400).json({ error: "VK ID не найден" });
 
     const response = await axios.get(
       `https://api.yookassa.ru/v3/payments/${id}`,
@@ -90,7 +100,22 @@ app.get("/payment-status/:id", async (req, res) => {
       }
     );
 
-    res.json(response.data);
+    const status = response.data.status;
+
+    // Если платеж успешен и еще не обновляли подписку
+    if (status === "succeeded" && !subscriptions[vk_id].endDate) {
+      const end = new Date();
+      end.setMonth(end.getMonth() + 1);
+      subscriptions[vk_id].status = "succeeded";
+      subscriptions[vk_id].endDate = end.toISOString();
+    } else {
+      subscriptions[vk_id].status = status;
+    }
+
+    res.json({
+      status: subscriptions[vk_id].status,
+      endDate: subscriptions[vk_id].endDate
+    });
 
   } catch (error) {
     console.error("Ошибка проверки платежа:", error.response?.data || error.message);
